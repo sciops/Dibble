@@ -6,17 +6,14 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.database.Cursor;
 import android.graphics.Bitmap;
-import android.graphics.Canvas;
-import android.graphics.Color;
+import android.graphics.BitmapFactory;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
-import android.os.Environment;
 import android.provider.ContactsContract;
 import android.provider.MediaStore;
-import android.system.Os;
 import android.text.Editable;
-import android.util.Log;
+import android.util.Base64;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.Window;
@@ -29,7 +26,6 @@ import android.widget.TextView;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 
@@ -41,7 +37,6 @@ public class MainActivity extends Activity {
     public final static String EXTRA_MESSAGE = "com.sciops.home.dibble.MESSAGE";
     static final int REQUEST_IMAGE_CAPTURE = 792416;
     ImageView mImageView = null;
-    TextView textView1 = null;
     EditText editText = null;
     final String filename = "dibble-photo";
     final String filepath = "content://media/external/images/media/" + filename;
@@ -53,288 +48,66 @@ public class MainActivity extends Activity {
             boolean handled = false;
             if (actionId == EditorInfo.IME_ACTION_DONE) {
                 //save the text field
-                Editable e = editText.getText();
-                storeMessageField(String.valueOf(e));
+                storeField(editText.getId());
                 handled = true;
             }
             return handled;
         }
     };
 
-    public void setPhoneNoField(String phoneNo) {
-        textView1 = (TextView) findViewById(R.id.phoneNoTV);
-        textView1.setText(phoneNo);
-    }
-
-    public String getPhoneNoField() {
-        textView1 = (TextView) findViewById(R.id.phoneNoTV);
-        return (String) textView1.getText();
-    }
-
-    public void setMessageField(String message) {
-        editText = (EditText) findViewById(R.id.messageInputField);
+    public void setMessageField(String message, int id) {
+        editText = (EditText) findViewById(id);
         editText.setText(message);
     }
 
-    public String getMessageField() {
-        editText = (EditText) findViewById(R.id.messageInputField);
+    public String getMessageField(int id) {
+        editText = (EditText) findViewById(id);
         return String.valueOf(editText.getText());
     }
 
-    public void setImageDisplayed(Uri uri) {
+    private void setImageDisplayed(Bitmap bitmap) {
         mImageView = (ImageView) findViewById(R.id.mImageView);
-        //TODO: place bitmap stored in mmsUri into mImageView
+        mImageView.setImageBitmap(bitmap);
+        String msg = BitMapToString(bitmap);
+        storeString("photoDibble",msg);
     }
 
-    public Uri getImageDisplayed() {
+    private void retrieveImageDisplayed() {
         mImageView = (ImageView) findViewById(R.id.mImageView);
-        //TODO: save image displayed to uri and return it
-        return mmsUri;
+        String msg = retrieveString("photoDibble");
+        Bitmap bitmap = StringToBitMap(msg);
+        mImageView.setImageBitmap(bitmap);
     }
 
-    public void storeMessageField(String message) {
+    private void storeField(int id) {
+        String key = ""+id;
+        String message = getMessageField(id);
+        storeString(key,message);
+    }
+
+    private String retrieveField(int id) {
+        String key = ""+id;
+        String message = retrieveString(key);
+        setMessageField(message, id);
+        return message;
+    }
+
+    public void storeString(String key, String message) {
         SharedPreferences sharedPref = this.getPreferences(Context.MODE_PRIVATE);
         SharedPreferences.Editor editor = sharedPref.edit();
-        editor.putString("messageToSend", message);
+        editor.putString(key, message);
         editor.commit();
     }
 
-    public void storePhoneNoField(String phoneNo) {
+    public String retrieveString(String key) {
         SharedPreferences sharedPref = this.getPreferences(Context.MODE_PRIVATE);
-        SharedPreferences.Editor editor = sharedPref.edit();
-        editor.putString("phoneNo", phoneNo);
-        editor.commit();
+        return sharedPref.getString(key, "");
     }
-
-    public String retrieveStoredMessage() {
-        SharedPreferences sharedPref = this.getPreferences(Context.MODE_PRIVATE);
-        return sharedPref.getString("messageToSend", "MSG NOT SET");
-    }
-
-    public String retrieveStoredPhoneNo() {
-        SharedPreferences sharedPref = this.getPreferences(Context.MODE_PRIVATE);
-        return sharedPref.getString("phoneNo", "NUM NOT SET");
-    }
-
-
-
-/*
-    //https://stackoverflow.com/questions/10490329/android-mms-intent-with-with-image-and-body-text
-    //"Can't find photo"
-    public void composeMmsMessage() {
-        Intent intent = new Intent(Intent.ACTION_SEND);
-        intent.putExtra("sms_body", "Hi how are you");
-        intent.putExtra(Intent.EXTRA_STREAM, Uri.fromFile(new File("/sdcard/file.gif")));
-        intent.setType("image/gif");
-        startActivity(Intent.createChooser(intent, "Send"));
-    }
-*/
-
-    /*
-    //https://stackoverflow.com/questions/11621507/send-a-jpg-image-throug-mms-using-htc
-    //crashes on MMS button press.
-    //No Activity found to handle Intent { act=android.intent.action.SENDTO typ=image/jpeg (has extras)
-    public void composeMmsMessage() {
-        Intent intent = new Intent(Intent.ACTION_SENDTO, Uri.parse("mmsto:"+getPhoneNoField()));
-        intent.putExtra("address", getPhoneNoField());
-        intent.putExtra(Intent.EXTRA_STREAM, mmsUri);
-        intent.setType("image/jpeg");
-        startActivity(intent);
-    }
-    */
-
-    /*
-    //https://stackoverflow.com/questions/26375969/action-send-intent-with-image-doesnt-update-if-draft-not-delete-android-sms-ha
-    public static Bitmap getBitmapFromView(View view, int width, int height) {
-        view.setDrawingCacheEnabled(true);
-        view.buildDrawingCache(true);
-        view.setBackgroundColor(Color.WHITE);
-
-        // creates immutable clone
-        Bitmap bmp = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
-        Canvas canvas = new Canvas(bmp);
-        view.draw(canvas);
-
-        view.setDrawingCacheEnabled(false); // clear drawing cache
-        return bmp;
-    }
-    */
-
-    /*
-
-    //https://stackoverflow.com/questions/26375969/action-send-intent-with-image-doesnt-update-if-draft-not-delete-android-sms-ha
-    //same problem. "Can't find photo"
-    public void composeMmsMessage() {
-
-        Bitmap icon = getBitmapFromView(mImageView, mImageView.getWidth(), mImageView.getHeight());
-        Intent share = new Intent(Intent.ACTION_SEND);
-        share.setType("image/jpeg");//
-        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
-        icon.compress(Bitmap.CompressFormat.JPEG, 100, bytes);
-        //String path1 = Environment.getExternalStorageDirectory() + File.separator + "lolhistory_sc.jpg";
-        //File f = new File(path1);
-        File f = new File(filepath);
-        try {
-            if (f.exists()) {
-                // delete if exists
-                f.delete();
-            }
-            f.createNewFile();
-            FileOutputStream fos = new FileOutputStream(f);
-            fos.write(bytes.toByteArray());
-            fos.flush();
-            fos.close();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        String path2 = "file://" + f.getAbsolutePath();
-        //Log.d("", path1);
-        Log.d("", path2);
-        share.putExtra(Intent.EXTRA_STREAM, Uri.parse(path2));
-        startActivity(Intent.createChooser(share, "Share Image"));
-
-    }
-    */
-
-    /*
-//crashes.
-//https://cells-source.cs.columbia.edu/plugins/gitiles/platform/packages/apps/Mms/+/android-4.3_r2.1/src/com/android/mms/ui/ComposeMessageActivity.java
-    public void composeMmsMessage() {
-        Activity activity = this;
-        Intent intent;
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) // Android 4.4 and up
-        {
-            intent = new Intent(Intent.ACTION_SEND);
-            intent.setClassName("com.android.mms", "com.android.mms.ui.ComposeMessageActivity");
-            intent.putExtra("sms_body", getMessageField());
-            intent.putExtra("address", getPhoneNoField());
-            intent.putExtra(Intent.EXTRA_STREAM, Uri.parse(filepath));
-            intent.setType("image/png");
-
-            String defaultSmsPackageName = Telephony.Sms.getDefaultSmsPackage(activity);
-
-            if (defaultSmsPackageName != null) // Can be null in case that there is no default, then the user would be able to choose any app that supports this intent.
-            {
-                intent.setPackage(defaultSmsPackageName);
-            }
-        } else {//earlier versions of android
-            intent = new Intent(Intent.ACTION_VIEW);
-            intent.setType("vnd.android-dir/mms-sms");
-            intent.putExtra("address", getPhoneNoField());
-            intent.putExtra("sms_body", getMessageField());
-
-            intent.putExtra(Intent.EXTRA_STREAM, mmsUri);
-        }
-        startActivity(intent);
-    }
-    */
-
-    /*
-    //https://stackoverflow.com/questions/20079047/android-kitkat-4-4-hangouts-cannot-handle-sending-sms-intent
-    //this works without attaching picture.
-    public void composeMmsMessage() {
-        Activity activity = this;
-        Intent intent;
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) // Android 4.4 and up
-        {
-            String defaultSmsPackageName = Telephony.Sms.getDefaultSmsPackage(activity);
-            intent = new Intent(Intent.ACTION_SENDTO, Uri.parse("smsto:" + Uri.encode(getPhoneNoField())));
-            intent.putExtra("sms_body", getMessageField());
-            intent.putExtra(Intent.EXTRA_STREAM, mmsUri);//ignored by intent?
-
-            if (defaultSmsPackageName != null) // Can be null in case that there is no default, then the user would be able to choose any app that supports this intent.
-            {
-                intent.setPackage(defaultSmsPackageName);
-            }
-        } else {//earlier versions of android
-            intent = new Intent(Intent.ACTION_VIEW);
-            intent.setType("vnd.android-dir/mms-sms");
-            intent.putExtra("address", getPhoneNoField());
-            intent.putExtra("sms_body", getMessageField());
-
-            intent.putExtra(Intent.EXTRA_STREAM, mmsUri);
-        }
-        startActivity(intent);
-    }
-    */
-
-/*
-    public void composeMmsMessage() {
-        Intent intent = new Intent(Intent.ACTION_SEND);
-        editText = (EditText) findViewById(R.id.messageInputField);
-        intent.putExtra("sms_body", String.valueOf(editText.getText()));
-        intent.putExtra(Intent.EXTRA_STREAM, mmsUri);
-        intent.setType("image/png");
-        if (intent.resolveActivity(getPackageManager()) != null)
-            startActivity(intent);
-    }
-*/
-    /*
-    //https://stackoverflow.com/questions/10833697/send-mms-without-user-interaction-in-android
-    public void composeMmsMessage() {
-        textView1 = (TextView) findViewById(R.id.phoneNoTV);
-        String phoneNo = (String) textView1.getText();
-        editText = (EditText) findViewById(R.id.messageInputField);
-        String message = String.valueOf(editText.getText());
-        Uri attachment = this.uri;
-        Intent intent = new Intent(Intent.ACTION_SENDTO);
-        //String dataParam = "mmsto:"+phoneNo;
-        //intent.setData(Uri.parse(dataParam));  // This ensures only SMS apps respond
-        intent.putExtra("sms_body", message);
-        intent.putExtra(Intent.EXTRA_STREAM, attachment);
-        intent.setType("image/png");
-        Log.i("composeMmsMessage","begin if statement");
-        if (intent.resolveActivity(getPackageManager()) != null) {
-            startActivity(intent);
-        }
-    }
-    */
-
-    /*
-    //https://stackoverflow.com/questions/8295773/how-can-i-transform-a-bitmap-into-a-uri
-    public Uri getImageUri(Context inContext, Bitmap inImage) throws IOException {
-        String filename = "dibble-photo-"+getCurrentTimeStamp();
-        File file = new File(getExternalFilesDir(null),filename);
-        return Uri.fromFile(file);
-    }
-    */
-
-    /*
-    // https://stackoverflow.com/questions/1459656/how-to-get-the-current-time-in-yyyy-mm-dd-hhmisec-millisecond-format-in-java
-    public static String getCurrentTimeStamp() {
-        SimpleDateFormat sdfDate = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");//dd/MM/yyyy
-        Date now = new Date();
-        String strDate = sdfDate.format(now);
-        return strDate;
-    }
-    */
-
-    /*
-    // http://www.codota.com/android/methods/android.content.Context/getExternalFilesDir
-    private Uri saveImage(Bitmap finalBitmap) {
-        //String filename = "dibble-photo-"+getCurrentTimeStamp()+".png";
-        //File file = new File(Environment.getExternalStorageDirectory().getAbsolutePath()+"/DCIM/Camera/"+filename);
-        File file = new File(filepath);
-        if (file.exists ()) file.delete ();//overwrites existing file
-        try {
-            FileOutputStream out = new FileOutputStream(file);
-            //finalBitmap.compress(Bitmap.CompressFormat.JPEG, 90, out);
-            finalBitmap.compress(Bitmap.CompressFormat.PNG, 100, out);
-            //out.flush();
-            if (out != null)
-                out.close();
-
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        return Uri.fromFile(file);
-    }
-    */
 
     /*
     //http://androidforums.com/threads/send-an-image-action_send.25988/
     //this correctly attaches photo but does not specify recipient or message.
-    private void composeMmsMessage() {
+    private void sendComposeIntent() {
         File F = getFileStreamPath(filename + ".jpg");
         Uri U = Uri.fromFile(F);
         Intent i = new Intent(Intent.ACTION_SEND);
@@ -347,7 +120,7 @@ public class MainActivity extends Activity {
     //modified above. will compose message with image and message text, but contact must be chosen each time because it's not SENDTO
     //attempts to modify this with SENDTO result in intent filter problem.
     //doesnt work for 2.1 eris: messaging intent incompatible.
-    private void composeMmsMessage() {
+    private void sendComposeIntent(String message) {
         Intent intent = null;
         File file = getFileStreamPath(filename + ".jpg");
         Uri uri = Uri.fromFile(file);
@@ -355,16 +128,16 @@ public class MainActivity extends Activity {
             intent = new Intent(Intent.ACTION_SEND);//working line but without phone number passed
             intent.setType("image/jpg");
             intent.putExtra(Intent.EXTRA_STREAM, uri);
-            intent.putExtra(Intent.EXTRA_TEXT, getMessageField());//https://developer.android.com/training/sharing/send.html#send-text-content
-            intent.putExtra(Intent.EXTRA_PHONE_NUMBER, getPhoneNoField());//ignored
+            intent.putExtra(Intent.EXTRA_TEXT, message);//https://developer.android.com/training/sharing/send.html#send-text-content
         } else {//earlier versions of android
             intent = new Intent(Intent.ACTION_VIEW);
             intent.setType("vnd.android-dir/mms-sms");
-            intent.putExtra("address", getPhoneNoField());
-            intent.putExtra("sms_body", getMessageField());
+            //intent.putExtra("address", getPhoneNoField());
+            intent.putExtra("sms_body", message);
             intent.putExtra(Intent.EXTRA_STREAM, uri);
         }
-        startActivity(Intent.createChooser(intent, "Send Image To:"));
+        startActivityForResult(Intent.createChooser(intent, "Send Image To:"),564561);
+
     }
 
     //http://androidforums.com/threads/send-an-image-action_send.25988/
@@ -396,39 +169,13 @@ public class MainActivity extends Activity {
         if (requestCode == REQUEST_IMAGE_CAPTURE && resultCode == RESULT_OK) {
             Bundle extras = data.getExtras();
             Bitmap imageBitmap = (Bitmap) extras.get("data");
-            mImageView.setImageBitmap(imageBitmap);
+            //set displayed image thumbnail and store in shared preferences
+            setImageDisplayed(imageBitmap);
             try {
+                //save the image to SD card so other apps can access it
                 saveImage(imageBitmap);
             } catch (IOException e) {
                 e.printStackTrace();
-            }
-        }
-
-        // Check which request it is that we're responding to
-        if (requestCode == PICK_CONTACT_REQUEST) {
-            // Make sure the request was successful
-            if (resultCode == RESULT_OK) {
-                // Get the URI that points to the selected contact
-                Uri contactUri = data.getData();
-                // We only need the NUMBER column, because there will be only one row in the result
-                String[] projection = {ContactsContract.CommonDataKinds.Phone.NUMBER};
-
-                // Perform the query on the contact to get the NUMBER column
-                // We don't need a selection or sort order (there's only one result for the given URI)
-                // CAUTION: The query() method should be called from a separate thread to avoid blocking
-                // your app's UI thread. (For simplicity of the sample, this code doesn't do that.)
-                // Consider using CursorLoader to perform the query.
-                Cursor cursor = getContentResolver()
-                        .query(contactUri, projection, null, null, null);
-                cursor.moveToFirst();
-
-                // Retrieve the phone number from the NUMBER column
-                int column = cursor.getColumnIndex(ContactsContract.CommonDataKinds.Phone.NUMBER);
-                String phoneNo = cursor.getString(column);
-
-                // Do something with the phone number...
-                setPhoneNoField(phoneNo);
-                storePhoneNoField(phoneNo);
             }
         }
     }
@@ -443,50 +190,68 @@ public class MainActivity extends Activity {
 
         setContentView(R.layout.activity_main);
 
-        editText = (EditText) findViewById(R.id.messageInputField);
+        editText = (EditText) findViewById(R.id.msgInField3);
 
-        //pick contact button
-         final Button buttonContact = (Button) findViewById(R.id.buttonPickContact);
-        buttonContact.setOnClickListener(new View.OnClickListener() {
-             public void onClick(View v) {
-                 // Perform action on click
-                 pickContact();
-             }
-         });
-
-        //take photo button
-        final Button buttonPic = (Button) findViewById(R.id.buttonTakePic);
-        buttonPic.setOnClickListener(new View.OnClickListener() {
+        this.mImageView = (ImageView) findViewById(R.id.mImageView);
+        mImageView.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
-                // Perform action on click
                 takePhoto();
             }
         });
 
-        //send mms button
-        final Button mmsButton = (Button) findViewById(R.id.buttonSendMMS);
-        mmsButton.setOnClickListener(new View.OnClickListener() {
+        //send button 1
+        final Button sendButton1 = (Button) findViewById(R.id.sendButton1);
+        sendButton1.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
-                composeMmsMessage();
+                editText = (EditText) findViewById(R.id.msgInField1);
+                sendComposeIntent(getMessageField(editText.getId()));
             }
         });
 
-        this.mImageView = (ImageView) findViewById(R.id.mImageView);
+        //send button 2
+        final Button sendButton2 = (Button) findViewById(R.id.sendButton2);
+        sendButton2.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                editText = (EditText) findViewById(R.id.msgInField2);
+                sendComposeIntent(getMessageField(editText.getId()));
+            }
+        });
+
+        //send button 3
+        final Button sendButton3 = (Button) findViewById(R.id.sendButton3);
+        sendButton3.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                editText = (EditText) findViewById(R.id.msgInField3);
+                sendComposeIntent(getMessageField(editText.getId()));
+            }
+        });
+
+
     }
 
     @Override
     protected void onPause() {
         super.onPause();
-        storePhoneNoField(getPhoneNoField());
-        storeMessageField(getMessageField());
+        //storePhoneNoField(getPhoneNoField());
+        editText = (EditText) findViewById(R.id.msgInField1);
+        storeField(editText.getId());
+        editText = (EditText) findViewById(R.id.msgInField2);
+        storeField(editText.getId());
+        editText = (EditText) findViewById(R.id.msgInField3);
+        storeField(editText.getId());
     }
 
     @Override
     protected void onResume() {
         super.onResume();
-        setPhoneNoField(retrieveStoredPhoneNo());
-        setMessageField(retrieveStoredMessage());
-        setImageDisplayed(mmsUri);
+        //setPhoneNoField(retrieveStoredPhoneNo());
+        editText = (EditText) findViewById(R.id.msgInField1);
+        retrieveField(editText.getId());
+        editText = (EditText) findViewById(R.id.msgInField2);
+        retrieveField(editText.getId());
+        editText = (EditText) findViewById(R.id.msgInField3);
+        retrieveField(editText.getId());
+
 
     }
 
@@ -515,4 +280,28 @@ public class MainActivity extends Activity {
         return super.onOptionsItemSelected(item);
     }
     */
+
+    //https://stackoverflow.com/questions/13562429/how-many-ways-to-convert-bitmap-to-string-and-vice-versa
+    public String BitMapToString(Bitmap bitmap){
+        ByteArrayOutputStream baos=new  ByteArrayOutputStream();
+        bitmap.compress(Bitmap.CompressFormat.PNG,100, baos);
+        byte [] b=baos.toByteArray();
+        String temp= Base64.encodeToString(b, Base64.DEFAULT);
+        return temp;
+    }
+
+    /**
+     * @param encodedString
+     * @return bitmap (from given string)
+     */
+    public Bitmap StringToBitMap(String encodedString){
+        try {
+            byte [] encodeByte=Base64.decode(encodedString,Base64.DEFAULT);
+            Bitmap bitmap= BitmapFactory.decodeByteArray(encodeByte, 0, encodeByte.length);
+            return bitmap;
+        } catch(Exception e) {
+            e.getMessage();
+            return null;
+        }
+    }
 }
