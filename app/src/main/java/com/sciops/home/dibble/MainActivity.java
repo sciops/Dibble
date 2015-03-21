@@ -9,10 +9,12 @@ import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.provider.ContactsContract;
 import android.provider.MediaStore;
+import android.system.Os;
 import android.text.Editable;
 import android.util.Log;
 import android.view.KeyEvent;
@@ -27,6 +29,7 @@ import android.widget.TextView;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 
@@ -38,9 +41,10 @@ public class MainActivity extends Activity {
     public final static String EXTRA_MESSAGE = "com.sciops.home.dibble.MESSAGE";
     static final int REQUEST_IMAGE_CAPTURE = 792416;
     ImageView mImageView = null;
-    TextView textView1 =null;
+    TextView textView1 = null;
     EditText editText = null;
-    final String filepath = "content://media/external/images/media/dibble-photo";
+    final String filename = "dibble-photo";
+    final String filepath = "content://media/external/images/media/" + filename;
     final Uri mmsUri = Uri.parse(filepath);
 
     OnEditorActionListener listener = new OnEditorActionListener() {
@@ -82,30 +86,64 @@ public class MainActivity extends Activity {
         //TODO: place bitmap stored in mmsUri into mImageView
     }
 
+    public Uri getImageDisplayed() {
+        mImageView = (ImageView) findViewById(R.id.mImageView);
+        //TODO: save image displayed to uri and return it
+        return mmsUri;
+    }
+
     public void storeMessageField(String message) {
         SharedPreferences sharedPref = this.getPreferences(Context.MODE_PRIVATE);
         SharedPreferences.Editor editor = sharedPref.edit();
-        editor.putString("messageToSend",message);
+        editor.putString("messageToSend", message);
         editor.commit();
     }
 
     public void storePhoneNoField(String phoneNo) {
         SharedPreferences sharedPref = this.getPreferences(Context.MODE_PRIVATE);
         SharedPreferences.Editor editor = sharedPref.edit();
-        editor.putString("phoneNo",phoneNo);
+        editor.putString("phoneNo", phoneNo);
         editor.commit();
     }
 
     public String retrieveStoredMessage() {
         SharedPreferences sharedPref = this.getPreferences(Context.MODE_PRIVATE);
-        return sharedPref.getString("messageToSend","MSG NOT SET");
+        return sharedPref.getString("messageToSend", "MSG NOT SET");
     }
 
     public String retrieveStoredPhoneNo() {
         SharedPreferences sharedPref = this.getPreferences(Context.MODE_PRIVATE);
-        return sharedPref.getString("phoneNo","NUM NOT SET");
+        return sharedPref.getString("phoneNo", "NUM NOT SET");
     }
 
+
+
+/*
+    //https://stackoverflow.com/questions/10490329/android-mms-intent-with-with-image-and-body-text
+    //"Can't find photo"
+    public void composeMmsMessage() {
+        Intent intent = new Intent(Intent.ACTION_SEND);
+        intent.putExtra("sms_body", "Hi how are you");
+        intent.putExtra(Intent.EXTRA_STREAM, Uri.fromFile(new File("/sdcard/file.gif")));
+        intent.setType("image/gif");
+        startActivity(Intent.createChooser(intent, "Send"));
+    }
+*/
+
+    /*
+    //https://stackoverflow.com/questions/11621507/send-a-jpg-image-throug-mms-using-htc
+    //crashes on MMS button press.
+    //No Activity found to handle Intent { act=android.intent.action.SENDTO typ=image/jpeg (has extras)
+    public void composeMmsMessage() {
+        Intent intent = new Intent(Intent.ACTION_SENDTO, Uri.parse("mmsto:"+getPhoneNoField()));
+        intent.putExtra("address", getPhoneNoField());
+        intent.putExtra(Intent.EXTRA_STREAM, mmsUri);
+        intent.setType("image/jpeg");
+        startActivity(intent);
+    }
+    */
+
+    /*
     //https://stackoverflow.com/questions/26375969/action-send-intent-with-image-doesnt-update-if-draft-not-delete-android-sms-ha
     public static Bitmap getBitmapFromView(View view, int width, int height) {
         view.setDrawingCacheEnabled(true);
@@ -120,6 +158,9 @@ public class MainActivity extends Activity {
         view.setDrawingCacheEnabled(false); // clear drawing cache
         return bmp;
     }
+    */
+
+    /*
 
     //https://stackoverflow.com/questions/26375969/action-send-intent-with-image-doesnt-update-if-draft-not-delete-android-sms-ha
     //same problem. "Can't find photo"
@@ -153,6 +194,7 @@ public class MainActivity extends Activity {
         startActivity(Intent.createChooser(share, "Share Image"));
 
     }
+    */
 
     /*
 //crashes.
@@ -267,7 +309,8 @@ public class MainActivity extends Activity {
     }
     */
 
-    /* http://www.codota.com/android/methods/android.content.Context/getExternalFilesDir */
+    /*
+    // http://www.codota.com/android/methods/android.content.Context/getExternalFilesDir
     private Uri saveImage(Bitmap finalBitmap) {
         //String filename = "dibble-photo-"+getCurrentTimeStamp()+".png";
         //File file = new File(Environment.getExternalStorageDirectory().getAbsolutePath()+"/DCIM/Camera/"+filename);
@@ -284,8 +327,54 @@ public class MainActivity extends Activity {
         } catch (Exception e) {
             e.printStackTrace();
         }
-
         return Uri.fromFile(file);
+    }
+    */
+
+    /*
+    //http://androidforums.com/threads/send-an-image-action_send.25988/
+    //this correctly attaches photo but does not specify recipient or message.
+    private void composeMmsMessage() {
+        File F = getFileStreamPath(filename + ".jpg");
+        Uri U = Uri.fromFile(F);
+        Intent i = new Intent(Intent.ACTION_SEND);
+        i.setType("image/jpg");
+        i.putExtra(Intent.EXTRA_STREAM, U);
+        startActivity(Intent.createChooser(i, "Send Image To:"));
+    }
+    */
+
+    //modified above. will compose message with image and message text, but contact must be chosen each time because it's not SENDTO
+    //attempts to modify this with SENDTO result in intent filter problem.
+    //doesnt work for 2.1 eris: messaging intent incompatible.
+    private void composeMmsMessage() {
+        Intent intent = null;
+        File file = getFileStreamPath(filename + ".jpg");
+        Uri uri = Uri.fromFile(file);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {// Android 4.4 and up
+            intent = new Intent(Intent.ACTION_SEND);//working line but without phone number passed
+            intent.setType("image/jpg");
+            intent.putExtra(Intent.EXTRA_STREAM, uri);
+            intent.putExtra(Intent.EXTRA_TEXT, getMessageField());//https://developer.android.com/training/sharing/send.html#send-text-content
+            intent.putExtra(Intent.EXTRA_PHONE_NUMBER, getPhoneNoField());//ignored
+        } else {//earlier versions of android
+            intent = new Intent(Intent.ACTION_VIEW);
+            intent.setType("vnd.android-dir/mms-sms");
+            intent.putExtra("address", getPhoneNoField());
+            intent.putExtra("sms_body", getMessageField());
+            intent.putExtra(Intent.EXTRA_STREAM, uri);
+        }
+        startActivity(Intent.createChooser(intent, "Send Image To:"));
+    }
+
+    //http://androidforums.com/threads/send-an-image-action_send.25988/
+    private Uri saveImage(Bitmap bm) throws IOException {
+        FileOutputStream Os = openFileOutput(filename + ".jpg", Context.MODE_WORLD_READABLE);
+        bm.compress(Bitmap.CompressFormat.JPEG, 100, Os);
+        Os.close();
+        File F = getFileStreamPath(filename + ".jpg");
+        Uri U = Uri.fromFile(F);
+        return U;
     }
 
     private void takePhoto() {
@@ -308,7 +397,11 @@ public class MainActivity extends Activity {
             Bundle extras = data.getExtras();
             Bitmap imageBitmap = (Bitmap) extras.get("data");
             mImageView.setImageBitmap(imageBitmap);
-            saveImage(imageBitmap);
+            try {
+                saveImage(imageBitmap);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
         }
 
         // Check which request it is that we're responding to
