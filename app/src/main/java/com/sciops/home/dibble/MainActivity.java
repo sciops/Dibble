@@ -4,15 +4,12 @@ import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
-import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.net.Uri;
-import android.os.Build;
 import android.os.Bundle;
 import android.provider.ContactsContract;
 import android.provider.MediaStore;
-import android.text.Editable;
 import android.util.Base64;
 import android.view.KeyEvent;
 import android.view.View;
@@ -36,6 +33,8 @@ public class MainActivity extends Activity {
     static final int PICK_CONTACT_REQUEST = 792415;  // The request code
     public final static String EXTRA_MESSAGE = "com.sciops.home.dibble.MESSAGE";
     static final int REQUEST_IMAGE_CAPTURE = 792416;
+    static final int SEND_INTENT_ID = 564561;
+    static final String IMG_STORAGE_KEY = "photoDibble";
     ImageView mImageView = null;
     EditText editText = null;
     final String filename = "dibble-photo";
@@ -68,14 +67,15 @@ public class MainActivity extends Activity {
     private void setImageDisplayed(Bitmap bitmap) {
         mImageView = (ImageView) findViewById(R.id.mImageView);
         mImageView.setImageBitmap(bitmap);
-        String msg = BitMapToString(bitmap);
-        storeString("photoDibble",msg);
+        String msg = bitMapToString(bitmap);
+        // also store it
+        storeString(IMG_STORAGE_KEY,msg);
     }
 
     private void retrieveImageDisplayed() {
         mImageView = (ImageView) findViewById(R.id.mImageView);
-        String msg = retrieveString("photoDibble");
-        Bitmap bitmap = StringToBitMap(msg);
+        String msg = retrieveString(IMG_STORAGE_KEY);
+        Bitmap bitmap = stringToBitMap(msg);
         mImageView.setImageBitmap(bitmap);
     }
 
@@ -117,6 +117,7 @@ public class MainActivity extends Activity {
     }
     */
 
+    /*
     //modified above. will compose message with image and message text, but contact must be chosen each time because it's not SENDTO
     //attempts to modify this with SENDTO result in intent filter problem.
     //doesnt work for 2.1 eris: messaging intent incompatible.
@@ -136,8 +137,24 @@ public class MainActivity extends Activity {
             intent.putExtra("sms_body", message);
             intent.putExtra(Intent.EXTRA_STREAM, uri);
         }
-        startActivityForResult(Intent.createChooser(intent, "Send Image To:"),564561);
+        startActivityForResult(Intent.createChooser(intent, "Send Image To:"),SEND_INTENT_ID);
+    }
+    */
 
+    //https://code.google.com/p/android/issues/detail?id=6151
+    //uses explicit intent for ComposeMessageActivity, may not work with older versions of android
+    //also may not work when a different mms application is set as default
+    private void sendComposeIntent(String message, String phoneNo) {
+        Intent intent = new Intent(Intent.ACTION_SEND);
+        File file = getFileStreamPath(filename + ".jpg");
+        Uri uri = Uri.fromFile(file);
+        intent.setClassName("com.android.mms",
+                "com.android.mms.ui.ComposeMessageActivity");
+        intent.putExtra("address", phoneNo);//telephone number here
+        intent.putExtra("sms_body", message);//sms message body here
+        intent.putExtra(Intent.EXTRA_STREAM, uri);
+        intent.setType("image/jpeg");
+        startActivity(intent);
     }
 
     //http://androidforums.com/threads/send-an-image-action_send.25988/
@@ -190,8 +207,6 @@ public class MainActivity extends Activity {
 
         setContentView(R.layout.activity_main);
 
-        editText = (EditText) findViewById(R.id.msgInField3);
-
         this.mImageView = (ImageView) findViewById(R.id.mImageView);
         mImageView.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
@@ -199,106 +214,50 @@ public class MainActivity extends Activity {
             }
         });
 
-        //send button 1
-        final Button sendButton1 = (Button) findViewById(R.id.sendButton1);
-        sendButton1.setOnClickListener(new View.OnClickListener() {
+        //send button
+        final Button sendButton = (Button) findViewById(R.id.sendButton);
+        sendButton.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
-                editText = (EditText) findViewById(R.id.msgInField1);
-                sendComposeIntent(getMessageField(editText.getId()));
+                String message = getMessageField(R.id.msgInField);
+                String phoneNo = getMessageField(R.id.phoneInField);
+                sendComposeIntent(message, phoneNo);
             }
         });
-
-        //send button 2
-        final Button sendButton2 = (Button) findViewById(R.id.sendButton2);
-        sendButton2.setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) {
-                editText = (EditText) findViewById(R.id.msgInField2);
-                sendComposeIntent(getMessageField(editText.getId()));
-            }
-        });
-
-        //send button 3
-        final Button sendButton3 = (Button) findViewById(R.id.sendButton3);
-        sendButton3.setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) {
-                editText = (EditText) findViewById(R.id.msgInField3);
-                sendComposeIntent(getMessageField(editText.getId()));
-            }
-        });
-
 
     }
 
     @Override
     protected void onPause() {
         super.onPause();
-        //storePhoneNoField(getPhoneNoField());
-        editText = (EditText) findViewById(R.id.msgInField1);
-        storeField(editText.getId());
-        editText = (EditText) findViewById(R.id.msgInField2);
-        storeField(editText.getId());
-        editText = (EditText) findViewById(R.id.msgInField3);
-        storeField(editText.getId());
+        storeField(R.id.msgInField);
+        storeField(R.id.phoneInField);
+        //image view is only stored at time of capture
     }
 
     @Override
     protected void onResume() {
         super.onResume();
-        //setPhoneNoField(retrieveStoredPhoneNo());
-        editText = (EditText) findViewById(R.id.msgInField1);
-        retrieveField(editText.getId());
-        editText = (EditText) findViewById(R.id.msgInField2);
-        retrieveField(editText.getId());
-        editText = (EditText) findViewById(R.id.msgInField3);
-        retrieveField(editText.getId());
-
-
+        retrieveField(R.id.msgInField);
+        retrieveField(R.id.phoneInField);
+        retrieveImageDisplayed();
     }
-
-
-    /*
-    @Override
-    public boolean onCreateOptionsMenu(Menu menu) {
-        // Inflate the menu; this adds items to the action bar if it is present.
-        getMenuInflater().inflate(R.menu.menu_main, menu);
-        return true;
-    }
-
-
-    @Override
-    public boolean onOptionsItemSelected(MenuItem item) {
-        // Handle action bar item clicks here. The action bar will
-        // automatically handle clicks on the Home/Up button, so long
-        // as you specify a parent activity in AndroidManifest.xml.
-        int id = item.getItemId();
-
-        //noinspection SimplifiableIfStatement
-        if (id == R.id.action_settings) {
-            return true;
-        }
-
-        return super.onOptionsItemSelected(item);
-    }
-    */
 
     //https://stackoverflow.com/questions/13562429/how-many-ways-to-convert-bitmap-to-string-and-vice-versa
-    public String BitMapToString(Bitmap bitmap){
+    public String bitMapToString(Bitmap bitmap){
         ByteArrayOutputStream baos=new  ByteArrayOutputStream();
         bitmap.compress(Bitmap.CompressFormat.PNG,100, baos);
         byte [] b=baos.toByteArray();
-        String temp= Base64.encodeToString(b, Base64.DEFAULT);
-        return temp;
+        return Base64.encodeToString(b, Base64.DEFAULT);
     }
 
     /**
      * @param encodedString
      * @return bitmap (from given string)
      */
-    public Bitmap StringToBitMap(String encodedString){
+    public Bitmap stringToBitMap(String encodedString){
         try {
             byte [] encodeByte=Base64.decode(encodedString,Base64.DEFAULT);
-            Bitmap bitmap= BitmapFactory.decodeByteArray(encodeByte, 0, encodeByte.length);
-            return bitmap;
+            return BitmapFactory.decodeByteArray(encodeByte, 0, encodeByte.length);
         } catch(Exception e) {
             e.getMessage();
             return null;
